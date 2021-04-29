@@ -1,81 +1,118 @@
 package main
 
 import (
+	"crypto/md5"
+	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
 
-	"github.com/fsnotify/fsnotify"
 	"github.com/mitchellh/go-ps"
 )
 
+var hashes map[string]string
+var folder string
+
+const (
+	interval = 10
+)
+
+func init() {
+	folder = os.Getenv("FALCO_ROOTDIR")
+	hashes = getFileHashes("./folder")
+}
+
 func main() {
-	rootDir := os.Getenv("FALCO_ROOTDIR")
-
+	ticker := time.NewTicker(interval * time.Second)
 	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGHUP)
-
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		log.Fatalf("could not create watcher:%v\n", err)
-	}
-	defer watcher.Close()
-
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	done := make(chan bool, 1)
 	go func() {
 		for {
 			select {
-			case event, channelIsStillOpened := <-watcher.Events:
-				if !channelIsStillOpened {
-					return
-				}
-				// k8s configmaps uses symlinks, we need this workaround.
-				// original configmap file is removed
-				if event.Op == fsnotify.Remove || event.Op == fsnotify.Write {
-					// remove the watcher since the file is removed
-					watcher.Remove(event.Name)
-					// add a new watcher pointing to the new symlink/file
-					watcher.Add(event.Name)
-
-					log.Printf("event:%v\n", event)
-
-					if err := reloadProcess(findPidOfFalcoProcess(), syscall.SIGHUP); err != nil {
-						log.Printf("could not reload falco: %v\n", err)
-						return
+			case <-ticker.C:
+				newHashes := getFileHashes(folder)
+				if !sameHashes(hashes, newHashes) {
+					if pid := findFalcoPID(); pid > 0 {
+						if err := reloadProcess(pid); err != nil {
+							continue
+						}
+						hashes = newHashes
 					}
 				}
-			case err, channelIsStillOpened := <-watcher.Errors:
-				if !channelIsStillOpened {
-					return
-				}
-				log.Fatalf("error:%v\n", err)
+			case <-sigs:
+				ticker.Stop()
+				done <- true
+				return
 			}
 		}
 	}()
-
-	// starting at the root of the project, walk each file/directory searching for
-	// directories
-	if err := filepath.Walk(rootDir, func(path string, info os.FileInfo, err error) error {
-		// since fsnotify can watch all the files in a directory, watchers only need
-		// to be added to each nested directory
-		if !info.Mode().IsDir() {
-			log.Printf("starting to watch %s\n", path)
-			return watcher.Add(path)
-		}
-
-		return nil
-	},
-	); err != nil {
-		log.Fatalf("could not walk directory %s:%v\n", rootDir, err)
-	}
-	<-make(chan struct{})
+	<-done
 }
 
-func reloadProcess(pid int, signal syscall.Signal) error {
+func sameHashes(previous, new map[string]string) bool {
+	for i, _ := range new {
+		if previous[i] != new[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func getFileHashes(folder string) map[string]string {
+	var files []string
+	err := filepath.Walk(folder, func(path string, info os.FileInfo, err error) error {
+		if !info.Mode().IsDir() {
+			files = append(files, path)
+		}
+		return nil
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	h := make(map[string]string, len(files))
+	md5hasher := md5.New()
+	for _, i := range files {
+		file, err := os.Open(i)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer file.Close()
+		_, err = io.Copy(md5hasher, file)
+		if err != nil {
+			log.Fatal(err)
+		}
+		sum := md5hasher.Sum(nil)
+		h[i] = fmt.Sprintf("%x", sum)
+	}
+	return h
+}
+
+func findFalcoPID() int {
+	processes, err := ps.Processes()
+
+	if err != nil {
+		return -1
+	}
+	for _, p := range processes {
+		if p.Executable() == "falco" {
+			log.Printf("executable %s found with pid %d\n", p.Executable(), p.Pid())
+			return p.Pid()
+		}
+	}
+	log.Printf("no executable for falco has been found\n")
+	return -1
+}
+
+func reloadProcess(pid int) error {
 	log.Printf("SIGHUP signal sending to PID %d\n", pid)
 
-	err := syscall.Kill(pid, signal)
+	err := syscall.Kill(pid, syscall.SIGHUP)
 	if err != nil {
 		log.Printf("could not send SIGHUP signal:%v\n", err)
 		return err
@@ -83,22 +120,4 @@ func reloadProcess(pid int, signal syscall.Signal) error {
 
 	log.Printf("SIGHUP signal send to PID %d\n", pid)
 	return nil
-}
-
-func findPidOfFalcoProcess() (int, error) {
-	processes, err := ps.Processes()
-
-	if err != nil {
-		return -1, err
-	}
-
-	var pid int
-	for _, p := range processes {
-		if p.Executable() == "falco" {
-			log.Printf("executable %s found with pid %d\n", p.Executable(), p.Pid())
-			pid = p.Pid()
-		}
-	}
-
-	return pid, nil
 }
