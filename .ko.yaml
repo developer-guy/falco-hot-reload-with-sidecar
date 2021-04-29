@@ -1,0 +1,2 @@
+baseImageOverrides:
+  github.com/developer-guy/hot-reloader: docker.io/alpine:latest
