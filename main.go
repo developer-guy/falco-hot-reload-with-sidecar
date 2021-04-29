@@ -38,39 +38,24 @@ func main(){
 				watcher.Add(event.Name)
 			    
                 log.Printf("event:%v\n", event)
-               
+                
                 falcoPID, err := findPidOfFalcoProcess()
-                log.Printf("SIGHUP signal sending to PID %d\n",falcoPID)
                 if err != nil {
-                    log.Fatalf("could not found pid of falco process:%v\n", err)
+                  log.Fatalf("could not found pid of falco process:%v\n", err)
                 }
-                
-                err = syscall.Kill(falcoPID, syscall.SIGHUP)
-                if err != nil {
-                    log.Fatalf("could not send SIGHUP signal:%v\n", err)
-                }
-                
-                log.Printf("SIGHUP signal send to PID %d", falcoPID)
 
+                reloadProcess(falcoPID, syscall.SIGHUP)
             }
 			// also allow normal files to be modified and reloaded.
 			if event.Op == fsnotify.Write {
                 log.Printf("event:%v\n", event)
-               
                 falcoPID, err := findPidOfFalcoProcess()
-                
-                log.Printf("SIGHUP signal sending to PID %d\n",falcoPID)
                 if err != nil {
-                    log.Fatalf("could not found pid of falco process:%v\n", err)
+                  log.Fatalf("could not found pid of falco process:%v\n", err)
                 }
-                
-                err = syscall.Kill(falcoPID, syscall.SIGHUP)
-                if err != nil {
-                    log.Fatalf("could not send SIGHUP signal:%v\n", err)
-                }
-                
-                log.Printf("SIGHUP signal send to PID %d\n", falcoPID)
-			}
+
+                reloadProcess(falcoPID, syscall.SIGHUP)
+            }
 		case err, ok := <-watcher.Errors:
             if !ok {
                 return
@@ -97,6 +82,20 @@ func main(){
 	    log.Fatalf("could not walk directory %s:%v\n",rootDir, err)
     }
     <- make(chan struct{})
+}
+
+func reloadProcess(pid int, signal syscall.Signal){
+                
+     log.Printf("SIGHUP signal sending to PID %d\n",pid)
+     
+     
+     
+     err = syscall.Kill(pid, signal)
+     if err != nil {
+       log.Fatalf("could not send SIGHUP signal:%v\n", err)
+     }
+     
+     log.Printf("SIGHUP signal send to PID %d\n", pid)
 }
 
 func findPidOfFalcoProcess() (int, error) {
