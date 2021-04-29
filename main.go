@@ -55,7 +55,7 @@ func main() {
 }
 
 func sameHashes(previous, new map[string]string) bool {
-	for i, _ := range new {
+	for i := range new {
 		if previous[i] != new[i] {
 			return false
 		}
@@ -66,7 +66,7 @@ func sameHashes(previous, new map[string]string) bool {
 func getFileHashes(folder string) map[string]string {
 	var files []string
 	err := filepath.Walk(folder, func(path string, info os.FileInfo, err error) error {
-		if !info.Mode().IsDir() {
+		if !info.Mode().IsDir() && (filepath.Ext(path) == ".yaml" || filepath.Ext(path) == ".yml") {
 			files = append(files, path)
 		}
 		return nil
