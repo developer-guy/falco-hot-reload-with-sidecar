@@ -37,6 +37,7 @@ func main() {
 			case <-ticker.C:
 				newHashes := getFileHashes(folder)
 				if !sameHashes(hashes, newHashes) {
+					log.Printf("a config file has changed, falco will be reloaded\n")
 					if pid := findFalcoPID(); pid > 0 {
 						if err := reloadProcess(pid); err != nil {
 							continue
@@ -101,7 +102,7 @@ func findFalcoPID() int {
 	}
 	for _, p := range processes {
 		if p.Executable() == "falco" {
-			log.Printf("executable %s found with pid %d\n", p.Executable(), p.Pid())
+			log.Printf("found executable %s (pid: %d)\n", p.Executable(), p.Pid())
 			return p.Pid()
 		}
 	}
@@ -110,14 +111,12 @@ func findFalcoPID() int {
 }
 
 func reloadProcess(pid int) error {
-	log.Printf("SIGHUP signal sending to PID %d\n", pid)
-
 	err := syscall.Kill(pid, syscall.SIGHUP)
 	if err != nil {
-		log.Printf("could not send SIGHUP signal:%v\n", err)
+		log.Printf("could not send SIGHUP signal to falco: %v\n", err)
 		return err
 	}
 
-	log.Printf("SIGHUP signal send to PID %d\n", pid)
+	log.Printf("SIGHUP signal sent to falco (pid: %d)\n", pid)
 	return nil
 }
