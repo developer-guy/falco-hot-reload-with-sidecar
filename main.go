@@ -12,9 +12,6 @@ import (
 
 func main(){
     rootDir := os.Getenv("FALCO_ROOTDIR")
-    
-    sigs := make(chan os.Signal, 1)
-    signal.Notify(sigs, syscall.SIGHUP)
 
     watcher, err := fsnotify.NewWatcher()  
     if err != nil {
@@ -88,9 +85,7 @@ func reloadProcess(pid int, signal syscall.Signal){
                 
      log.Printf("SIGHUP signal sending to PID %d\n",pid)
      
-     
-     
-     err = syscall.Kill(pid, signal)
+     err := syscall.Kill(pid, signal)
      if err != nil {
        log.Fatalf("could not send SIGHUP signal:%v\n", err)
      }
