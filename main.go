@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/mitchellh/go-ps"
 )
 
 func main() {
@@ -82,4 +83,22 @@ func reloadProcess(pid int, signal syscall.Signal) error {
 
 	log.Printf("SIGHUP signal send to PID %d\n", pid)
 	return nil
+}
+
+func findPidOfFalcoProcess() (int, error) {
+	processes, err := ps.Processes()
+
+	if err != nil {
+		return -1, err
+	}
+
+	var pid int
+	for _, p := range processes {
+		if p.Executable() == "falco" {
+			log.Printf("executable %s found with pid %d\n", p.Executable(), p.Pid())
+			pid = p.Pid()
+		}
+	}
+
+	return pid, nil
 }
