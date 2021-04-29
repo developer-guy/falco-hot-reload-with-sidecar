@@ -23,7 +23,7 @@ const (
 
 func init() {
 	folder = os.Getenv("FALCO_ROOTDIR")
-	hashes = getFileHashes("./folder")
+	hashes = getFileHashes(folder)
 }
 
 func main() {
