@@ -88,7 +88,6 @@ func getFileHashes(folder string) map[string]string {
             
             sum := md5hasher.Sum(nil)
             
-            log.Printf("starting to watch file: %s\n", path)
             h[path] = fmt.Sprintf("%x", sum)
         }
          return nil
