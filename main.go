@@ -55,9 +55,9 @@ func main() {
 	<-done
 }
 
-func sameHashes(previous, new map[string]string) bool {
-	for i := range new {
-		if previous[i] != new[i] {
+func sameHashes(previous, current map[string]string) bool {
+	for i := range current {
+		if previous[i] != current[i] {
 			return false
 		}
 	}
@@ -65,32 +65,39 @@ func sameHashes(previous, new map[string]string) bool {
 }
 
 func getFileHashes(folder string) map[string]string {
-	var files []string
-	err := filepath.Walk(folder, func(path string, info os.FileInfo, err error) error {
+    h := make(map[string]string)
+	
+    md5hasher := md5.New()
+    
+    err := filepath.Walk(folder, func(path string, info os.FileInfo, err error) error {
 		if !info.Mode().IsDir() && (filepath.Ext(path) == ".yaml" || filepath.Ext(path) == ".yml") {
-			files = append(files, path)
-		}
-		return nil
+		    
+            file, err := os.Open(path)
+            
+            if err != nil {
+                log.Fatal(err)
+            }
+            
+            defer file.Close()
+            
+            _, err = io.Copy(md5hasher, file)
+      
+            if err != nil {
+                log.Fatal(err)
+            }
+            
+            sum := md5hasher.Sum(nil)
+            
+            log.Printf("starting to watch file: %s\n", path)
+            h[path] = fmt.Sprintf("%x", sum)
+        }
+         return nil
 	})
+
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
-	h := make(map[string]string, len(files))
-	md5hasher := md5.New()
-	for _, i := range files {
-		file, err := os.Open(i)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer file.Close()
-		_, err = io.Copy(md5hasher, file)
-		if err != nil {
-			log.Fatal(err)
-		}
-		sum := md5hasher.Sum(nil)
-		h[i] = fmt.Sprintf("%x", sum)
-	}
 	return h
 }
 
