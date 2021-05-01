@@ -159,9 +159,11 @@ spec:
       {{- if .Values.extraInitContainers }}
       initContainers:
         - name: copy-falco-binary
-          image: {{ template "falco.image" . }}
-          args:
-            - cp /usr/bin/falco /falco-binary-is-in-here/falco
+          image: falcosecurity/falco:0.28.0-slim
+          command:
+          - sh
+          - -c
+          - cp /usr/bin/falco /falco-binary-is-in-here/falco
           volumeMounts:
             - name: falco-binary
               mountPath: /falco-binary-is-in-here
