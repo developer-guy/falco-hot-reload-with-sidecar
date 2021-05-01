@@ -43,6 +43,7 @@ func main() {
 						for i := range hashes {
 							if err := validateRule(i); err != nil {
 								log.Printf("wrong syntax for rule file %s\n", i)
+								continue
 							}
 						}
 						if err := reloadProcess(pid); err != nil {
