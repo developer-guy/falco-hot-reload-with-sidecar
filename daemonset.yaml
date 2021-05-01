@@ -60,6 +60,8 @@ spec:
           volumeMounts:
           - mountPath: /etc/falco
             name: config-volume
+          - name: falco-binary
+            mountPath: /falco-binary
           lifecycle:
             postStart:
               exec:
@@ -156,6 +158,13 @@ spec:
             {{- end }}
       {{- if .Values.extraInitContainers }}
       initContainers:
+        - name: copy-falco-binary
+          image: {{ template "falco.image" . }}
+          args:
+            - cp /usr/bin/falco /falco-binary-is-in-here/falco
+          volumeMounts:
+            - name: falco-binary
+              mountPath: /falco-binary-is-in-here
 {{ toYaml .Values.extraInitContainers | indent 12 }}
       {{- end }}
       volumes:
@@ -187,6 +196,8 @@ spec:
         - name: etc-fs
           hostPath:
             path: /etc
+        - name: falco-binary
+          emptyDir: {}
         - name: config-volume
           configMap:
             name: {{ template "falco.fullname" . }}
