@@ -40,15 +40,19 @@ func main() {
 				if !sameHashes(hashes, newHashes) {
 					log.Printf("a config file has changed, falco will be reloaded\n")
 					if pid := findFalcoPID(); pid > 0 {
+						var valid bool
 						for i := range hashes {
 							if err := validateRule(i); err != nil {
 								log.Printf("wrong syntax for rule file %s\n", i)
+								break
+							}
+							valid = true
+						}
+						if valid {
+							if err := reloadProcess(pid); err != nil {
+								log.Printf("failed to reload falco\n")
 								continue
 							}
-						}
-						if err := reloadProcess(pid); err != nil {
-							log.Printf("failed to reload falco\n")
-							continue
 						}
 						hashes = newHashes
 					}
