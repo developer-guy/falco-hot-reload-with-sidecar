@@ -139,7 +139,7 @@ func reloadProcess(pid int) error {
 }
 
 func validateRule(ruleFile string) error {
-	cmd := exec.Command("/usr/bin/falco", "--validation", "-r", ruleFile)
+	cmd := exec.Command("/usr/bin/falco", "--validate", ruleFile)
 	err := cmd.Run()
 	if err != nil {
 		return err
