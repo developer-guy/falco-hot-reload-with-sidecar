@@ -44,6 +44,7 @@ func main() {
 						for i := range hashes {
 							if err := validateRule(i); err != nil {
 								log.Printf("wrong syntax for rule file %s\n", i)
+								valid = false
 								break
 							}
 							valid = true
