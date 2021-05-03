@@ -83,7 +83,7 @@ func getFileHashes(folder string) map[string]string {
 	md5hasher := md5.New()
 
 	err := filepath.Walk(folder, func(path string, info os.FileInfo, err error) error {
-		if !info.Mode().IsDir() && (filepath.Ext(path) == ".yaml" || filepath.Ext(path) == ".yml") {
+		if !info.Mode().IsDir() && (info.Name()+filepath.Ext(path) != "falco.yaml") && (filepath.Ext(path) == ".yaml" || filepath.Ext(path) == ".yml") {
 
 			file, err := os.Open(path)
 			if err != nil {
