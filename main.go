@@ -1,6 +1,7 @@
 package main
 
 import (
+    "strings"
 	"crypto/md5"
 	"fmt"
 	"io"
@@ -37,11 +38,11 @@ func main() {
 			select {
 			case <-ticker.C:
 				newHashes := getFileHashes(folder)
-				if !sameHashes(hashes, newHashes) {
-					log.Printf("a config file has changed, falco will be reloaded\n")
+                if file, same := sameHashes(hashes, newHashes); !same {
+					log.Printf("a config file %s has changed, falco will be reloaded\n", file)
 					if pid := findFalcoPID(); pid > 0 {
 						var valid bool
-						for i := range hashes {
+						for i := range newHashes {
 							if err := validateRule(i); err != nil {
 								log.Printf("wrong syntax for rule file %s\n", i)
 								valid = false
@@ -54,7 +55,9 @@ func main() {
 								log.Printf("failed to reload falco\n")
 								continue
 							}
-						}
+						}else {
+                            log.Println("could not reload the Falco process, rule files are not valid")
+                        }
 						hashes = newHashes
 					}
 				}
@@ -68,13 +71,13 @@ func main() {
 	<-done
 }
 
-func sameHashes(previous, current map[string]string) bool {
+func sameHashes(previous, current map[string]string) (string, bool) {
 	for i := range current {
 		if previous[i] != current[i] {
-			return false
+			return i, false
 		}
 	}
-	return true
+	return "", true
 }
 
 func getFileHashes(folder string) map[string]string {
@@ -83,7 +86,7 @@ func getFileHashes(folder string) map[string]string {
 	md5hasher := md5.New()
 
 	err := filepath.Walk(folder, func(path string, info os.FileInfo, err error) error {
-		if !info.Mode().IsDir() && (info.Name()+filepath.Ext(path) != "falco.yaml") && (filepath.Ext(path) == ".yaml" || filepath.Ext(path) == ".yml") {
+		if !info.Mode().IsDir() && !(strings.Contains(info.Name()+filepath.Ext(path), "falco.yaml")) && !(strings.HasPrefix(path, folder+"/"+ "..")) && (filepath.Ext(path) == ".yaml" || filepath.Ext(path) == ".yml") {
 
 			file, err := os.Open(path)
 			if err != nil {
@@ -99,7 +102,8 @@ func getFileHashes(folder string) map[string]string {
 			}
 
 			sum := md5hasher.Sum(nil)
-
+            
+            log.Printf("%s file adding to the map\n", path)
 			h[path] = fmt.Sprintf("%x", sum)
 		}
 		return nil
