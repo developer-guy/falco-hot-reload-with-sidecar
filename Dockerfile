@@ -1,6 +1,6 @@
 FROM ubuntu:18.04 as ubuntu
 
-ARG FALCO_VERSION
+ARG FALCO_VERSION=0.28.0
 ARG VERSION_BUCKET=bin
 
 ENV FALCO_VERSION=${FALCO_VERSION}
@@ -34,7 +34,6 @@ COPY --from=ubuntu /falco /
 
 CMD ["/usr/bin/falco", "-o", "time_format_iso_8601=true"]
 
-
 FROM golang:1.16.3-alpine as gobuild
 
 WORKDIR /falco-hot-reloader
@@ -58,5 +57,13 @@ WORKDIR /falco-hot-reloader
 
 COPY --from=falcobinary /usr/bin/falco /usr/bin/falco
 COPY --from=gobuild /falco-hot-reloader ./
+
+RUN mkdir -p /usr/share/falco/lua
+
+RUN mkdir -p /etc/falco
+
+COPY --from=ubuntu /falco/usr/share/falco/lua /usr/share/falco/lua
+
+COPY --from=ubuntu /falco/etc/falco/falco.yaml /etc/falco/falco.yaml
 
 ENTRYPOINT ["./falco-hot-reloader"]
