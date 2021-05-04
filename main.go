@@ -1,11 +1,13 @@
 package main
 
 import (
+    "strings"
 	"crypto/md5"
 	"fmt"
 	"io"
 	"log"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"syscall"
@@ -36,12 +38,26 @@ func main() {
 			select {
 			case <-ticker.C:
 				newHashes := getFileHashes(folder)
-				if !sameHashes(hashes, newHashes) {
-					log.Printf("a config file has changed, falco will be reloaded\n")
+                if file, same := sameHashes(hashes, newHashes); !same {
+					log.Printf("a config file %s has changed, falco will be reloaded\n", file)
 					if pid := findFalcoPID(); pid > 0 {
-						if err := reloadProcess(pid); err != nil {
-							continue
+						var valid bool
+						for i := range newHashes {
+							if err := validateRule(i); err != nil {
+								log.Printf("wrong syntax for rule file %s\n", i)
+								valid = false
+								break
+							}
+							valid = true
 						}
+						if valid {
+							if err := reloadProcess(pid); err != nil {
+								log.Printf("failed to reload falco\n")
+								continue
+							}
+						}else {
+                            log.Println("could not reload the Falco process, rule files are not valid")
+                        }
 						hashes = newHashes
 					}
 				}
@@ -55,48 +71,47 @@ func main() {
 	<-done
 }
 
-func sameHashes(previous, current map[string]string) bool {
+func sameHashes(previous, current map[string]string) (string, bool) {
 	for i := range current {
 		if previous[i] != current[i] {
-			return false
+			return i, false
 		}
 	}
-	return true
+	return "", true
 }
 
 func getFileHashes(folder string) map[string]string {
-    h := make(map[string]string)
-	
-    md5hasher := md5.New()
-    
-    err := filepath.Walk(folder, func(path string, info os.FileInfo, err error) error {
-		if !info.Mode().IsDir() && (filepath.Ext(path) == ".yaml" || filepath.Ext(path) == ".yml") {
-		    
-            file, err := os.Open(path)
+	h := make(map[string]string)
+
+	md5hasher := md5.New()
+
+	err := filepath.Walk(folder, func(path string, info os.FileInfo, err error) error {
+		if !info.Mode().IsDir() && !(strings.Contains(info.Name()+filepath.Ext(path), "falco.yaml")) && !(strings.HasPrefix(path, folder+"/"+ "..")) && (filepath.Ext(path) == ".yaml" || filepath.Ext(path) == ".yml") {
+
+			file, err := os.Open(path)
+			if err != nil {
+				log.Printf("can't open file %s\n", path)
+			}
+
+			defer file.Close()
+
+			_, err = io.Copy(md5hasher, file)
+
+			if err != nil {
+				log.Printf("error with file %s to get its hash\n", path)
+			}
+
+			sum := md5hasher.Sum(nil)
             
-            if err != nil {
-                log.Fatal(err)
-            }
-            
-            defer file.Close()
-            
-            _, err = io.Copy(md5hasher, file)
-      
-            if err != nil {
-                log.Fatal(err)
-            }
-            
-            sum := md5hasher.Sum(nil)
-            
-            h[path] = fmt.Sprintf("%x", sum)
-        }
-         return nil
+            log.Printf("%s file adding to the map\n", path)
+			h[path] = fmt.Sprintf("%x", sum)
+		}
+		return nil
 	})
 
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("error to get hashes\n")
 	}
-
 	return h
 }
 
@@ -124,5 +139,14 @@ func reloadProcess(pid int) error {
 	}
 
 	log.Printf("SIGHUP signal sent to falco (pid: %d)\n", pid)
+	return nil
+}
+
+func validateRule(ruleFile string) error {
+	cmd := exec.Command("/usr/bin/falco", "--validate", ruleFile)
+	err := cmd.Run()
+	if err != nil {
+		return err
+	}
 	return nil
 }
