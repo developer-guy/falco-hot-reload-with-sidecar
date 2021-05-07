@@ -1,5 +1,6 @@
-![screen_shoot](./screen_shoot.png)
 # Hot Reloading Support for Falco against its configuration and rule file changes in Kubernetes environment
+
+![screen_shoot](./screen_shoot.png)
 
 The falco project has a builtin [hot-reload feature](https://falco.org/docs/getting-started/running/#hot-reload), so, what is our concern to do that kind of project ? Simple, the Falco project can reload itself when it receives a _SIGHUP_ signal, so, think of that scenario in a Kubernetes environment, the Falco uses a [ConfigMap](https://github.com/falcosecurity/charts/blob/master/falco/templates/configmap.yaml) which includes configuration and rule files for Falco can use. The thing we want to add as a support is monitoring these files and detecting changes againts them and sending _SIGHUP_ signal to the Falco. In order to do that we need to know a couple of things:
 
