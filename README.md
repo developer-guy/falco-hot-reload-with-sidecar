@@ -27,19 +27,10 @@ We can configure this sync frequency in the _Kubelet_ with a parameter called [-
 
 * minikube v1.19.0
 * kubectl v1.21.0
-* ko 0.8.2
+* buildx v0.5.1-docker 11057da37336192bfc57d81e02359ba7ba848e4a
 * helm v3.5.4+g1b5edb6
 
 ## Demo
-
-You might notice that there is no Dockerfile to build&push our container image because we are using a tool called [ko](https://github.com/google/ko) which is maintained by Google. 
-
-_ko_ is a simple, fast container image builder for Go applications. It doesn't require a docker daemon running either.
-
-It's ideal for use cases where your image contains a single Go application without any/many dependencies on the OS base image (e.g., no cgo, no OS package dependencies).
-
-There is a file [.ko.yaml](.ko.yaml) which is used for configuring the _ko_ tool, to get more detail about the configuration details, please follow the [link](banzaicloud.com/blog/inject-secrets-into-pods-vault-revisited/).
-
 First, we need to clone the _Falco Helm Chart_ repository.
 
 ```bash
@@ -72,43 +63,22 @@ $ minikube start --extra-arg=kubelet.sync-frequency="10s"
 🏄  Done! kubectl is now configured to use "minikube" cluster and "default" namespace by default
 ```
 
-Now, let's build and push our container image by using _ko_ tool.
+Now, let's build and push our container image.
 
-> Don't forget to change the KO_DOCKER_REPO environment variable with your own DockerHub id.
 ```bash
-$ KO_DOCKER_REPO=devopps KO_CONFIG_PATH="./.ko.yaml" ko publish . --push=true
-2021/04/30 13:44:38 NOTICE!
------------------------------------------------------------------
-ko and go have mismatched GOROOT:
-    go/build.Default.GOROOT = "go"
-    $(go env GOROOT) = "/usr/local/Cellar/go/1.16.3/libexec"
-
-Inferring GOROOT="/usr/local/Cellar/go/1.16.3/libexec"
-
-Run this to remove this warning:
-    export GOROOT=$(go env GOROOT)
-
-For more information see:
-    https://github.com/google/ko/issues/106
------------------------------------------------------------------
-2021/04/30 13:44:39 Using base docker.io/alpine:latest for github.com/developer-guy/hot-reloader
-2021/04/30 13:44:42 Building github.com/developer-guy/hot-reloader for linux/amd64
-2021/04/30 13:44:43 Publishing devopps/hot-reloader-e3b38ca9a7f499a1b280629eff1473d3:latest
-2021/04/30 13:44:43 existing blob: sha256:540db60ca9383eac9e418f78490994d0af424aab7bf6d0e47ac8ed4e2e9bcbba
-2021/04/30 13:44:43 existing blob: sha256:72164b581b02b1eb297b403bcc8fc1bfa245cb52e103a3a525a0835a58ff58e2
-2021/04/30 13:44:45 pushed blob: sha256:e5dae823fc916552aa6393086d8592fa0d2481d1f08ff7269b35b7ad31c4d98e
-2021/04/30 13:44:47 pushed blob: sha256:852b7a207bbdec7ec70c4d0a2710b9eb0da0e26c836bf55f1a881e8d247723ea
-2021/04/30 13:44:47 devopps/hot-reloader-e3b38ca9a7f499a1b280629eff1473d3:latest: digest: sha256:63ce103e23bf358b15b2d71170066efa069795c165c6f55315ac4f37715489a7 size: 751
-2021/04/30 13:44:47 Published devopps/hot-reloader-e3b38ca9a7f499a1b280629eff1473d3@sha256:63ce103e23bf358b15b2d71170066efa069795c165c6f55315ac4f37715489a7
-devopps/hot-reloader-e3b38ca9a7f499a1b280629eff1473d3@sha256:63ce103e23bf358b15b2d71170066efa069795c165c6f55315ac4f37715489a7
+$ docker buildx -t $DOCKER_USERNAME/falco-hot-reloader:v1 .
+...
 ```
+
+> Buildx is a Docker CLI plugin for extended build capabilities with BuildKit, if you want to get more details about it, please follow the [link](https://github.com/docker/buildx).
+
 
 Then go into the chart folder of the Falco and add these lines to the _daemonset.yaml_ file.
 ```yaml
 shareProcessNamespace: true # to be able to access Falco process from the sidecar
 containers:
 - name: falco-hot-reloader
-  image: devopps/hot-reloader-e3b38ca9a7f499a1b280629eff1473d3@sha256:63ce103e23bf358b15b2d71170066efa069795c165c6f55315ac4f37715489a7 # don't forget to replace the digest here
+  image: devopps/hot-reloader-e3b38ca9a7f499a1b280629eff1473d3@sha256:63ce103e23bf358b15b2d71170066efa069795c165c6f55315ac4f37715489a7 # don't forget to replace here
   env:
   - name: FALCO_ROOTDIR
     value: /etc/falco
