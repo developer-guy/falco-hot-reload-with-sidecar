@@ -23,7 +23,6 @@ There is a really well explained section about this question in the Kubernetes d
 
 We can configure this sync frequency in the _Kubelet_ with a parameter called [--sync-frequency](https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet/#--sync-frequency).
 
-
 ## Prerequisites
 
 * minikube v1.19.0
@@ -79,7 +78,7 @@ Then go into the chart folder of the Falco and add these lines to the _daemonset
 shareProcessNamespace: true # to be able to access Falco process from the sidecar
 containers:
 - name: falco-hot-reloader
-  image: devopps/hot-reloader-e3b38ca9a7f499a1b280629eff1473d3@sha256:63ce103e23bf358b15b2d71170066efa069795c165c6f55315ac4f37715489a7 # don't forget to replace here
+  image: devopps/falco-hot-reloader:v1 # don't forget to replace with your $DOCKER_USERNAME
   env:
   - name: FALCO_ROOTDIR
     value: /etc/falco
@@ -128,13 +127,13 @@ Now, open the logs of the Falco pod, and then change something inside of the _Co
 ```bash
 $ kubectl logs -f falco-7269h --namespace falco
 ...
-# these logs belongs to a falco-hot-reloader container
+# These logs belongs to a falco-hot-reloader container
 2021/04/30 11:09:16 a config file has changed, falco will be reloaded 
 2021/04/30 11:09:16 found executable falco (pid: 19)
 2021/04/30 11:09:16 SIGHUP signal sent to falco (pid: 19)
 ...
 
-# these logs belongs to a falco container
+# These logs belongs to a falco container
 Fri Apr 30 11:09:16 2021: SIGHUP received, restarting...
 2021/04/30 11:09:16 starting to watch file: /etc/falco/falco_rules.yaml
 2021/04/30 11:09:16 a config file has changed, falco will be reloaded
